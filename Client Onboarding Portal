@@ -1,0 +1,143 @@
+function generateHirePurchaseAgreement(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var lastRow;
+
+  // Check if script is triggered automatically or run manually
+  if (e && e.values) {
+    lastRow = sheet.getLastRow();
+    var data = sheet.getRange(lastRow, 1, 1, sheet.getLastColumn()).getValues()[0]; 
+  } else {
+    lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("⚠️ No data found. The script will not run.");
+      return;
+    }
+    var data = sheet.getRange(lastRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
+  Logger.log("📌 New Form Submission Data: " + JSON.stringify(data));
+
+  var templateDocId = "10GKxoZGfmyMIrsx_R2W24DlYWYEmKIdd0bN-bGdix0I"; // Google Docs template ID
+  var folderId = "18Cxvsi61GzrFQaatrBUkyovrT2MzyfaV"; // Google Drive folder ID
+
+  var newDoc = DriveApp.getFileById(templateDocId).makeCopy("Hire Purchase Agreement - " + data[1], DriveApp.getFolderById(folderId));
+  var doc = DocumentApp.openById(newDoc.getId());
+  var body = doc.getBody();
+
+  function formatDate(dateValue) {
+    if (dateValue instanceof Date) {
+      return dateValue.toDateString();
+    } else if (typeof dateValue === "string") {
+      return new Date(dateValue).toDateString();
+    } else {
+      return "N/A";
+    }
+  }
+
+  // Ensure correct column positions
+  var fullName = data[1] || "N/A";
+  var email = data[2] || "N/A";
+  var phone = data[3] || "N/A";
+  var idNumber = data[4] || "N/A";
+  var nextOfKinName = data[5] || "N/A";
+  var nextOfKinContact = data[6] || "N/A";
+  var nextOfKinRelation = data[7] || "N/A";
+  var phoneModel = data[8] || "N/A";
+  var imei = data[9] || "N/A";
+  var deposit = data[10] || "N/A";
+  var weeklyInstallment = data[11] || "N/A";
+  var weeks = data[12] || "N/A";
+  var startPeriod = formatDate(data[21]); 
+  var endPeriod = formatDate(data[22]);  
+  var age = data[23] || "N/A";
+  var relation = data[24] || "N/A";
+  var shop = data[18] || "N/A";
+  var homeAddress = data[19] || "N/A";
+  var serialNumber = data[20] || "N/A";
+  var staff = data[25] || "N/A";
+  var accessoriesIncluded = data[26] || "N/A";
+  var signatureURL = data[17] || ""; // Column R (Index 17)
+
+  // Logging to confirm values before replacing
+  Logger.log("🔹 Full Name: " + fullName);
+  Logger.log("🔹 Phone: " + phone);
+  Logger.log("🔹 Email: " + email);
+  Logger.log("🔹 ID Number: " + idNumber);
+  Logger.log("🔹 Signature URL: " + signatureURL);
+
+  // Replace placeholders with actual values
+  body.replaceText("{{FullName}}", fullName);
+  body.replaceText("{{Email}}", email);
+  body.replaceText("{{Phone}}", phone);
+  body.replaceText("{{IDNumber}}", idNumber);
+  body.replaceText("{{Age}}", age);
+  body.replaceText("{{HomeAddress}}", homeAddress);
+  body.replaceText("{{NextOfKinName}}", nextOfKinName);
+  body.replaceText("{{NextOfKinContact}}", nextOfKinContact);
+  body.replaceText("{{Relation}}", nextOfKinRelation);
+  body.replaceText("{{PhoneModel}}", phoneModel);
+  body.replaceText("{{IMEI}}", imei);
+  body.replaceText("{{SerialNumber}}", serialNumber);
+  body.replaceText("{{Deposit}}", "Kshs. " + deposit);
+  body.replaceText("{{WeeklyInstallment}}", "Kshs. " + weeklyInstallment);
+  body.replaceText("{{Weeks}}", weeks);
+  body.replaceText("{{StartPeriod}}", startPeriod);
+  body.replaceText("{{EndPeriod}}", endPeriod);
+  body.replaceText("{{Shop}}", shop);
+  body.replaceText("{{Staff}}", staff);
+  body.replaceText("{{AccessoriesIncluded}}", accessoriesIncluded);
+
+  // Insert Signature Image
+  function extractFileId(url) {
+    if (!url) return null;
+    var match = url.match(/[-\w]{25,}/);
+    return match ? match[0] : null;
+  }
+
+  var signatureID = extractFileId(signatureURL);
+  Logger.log("📌 Extracted Signature File ID: " + signatureID);
+
+  if (signatureID) {
+    try {
+      var signatureFile = DriveApp.getFileById(signatureID);
+      var imageBlob = signatureFile.getBlob();
+
+      body.replaceText("{{Signature}}", ""); // Remove placeholder text
+      body.appendImage(imageBlob); // Insert signature image
+      Logger.log("✅ Signature inserted successfully!");
+    } catch (error) {
+      Logger.log("❌ Error inserting signature image: " + error.message);
+      body.replaceText("{{Signature}}", "⚠️ Error loading signature.");
+    }
+  } else {
+    body.replaceText("{{Signature}}", "⚠️ No signature uploaded.");
+  }
+
+  doc.saveAndClose();
+  var pdfDoc = newDoc.getAs(MimeType.PDF);
+
+  var emailAddress = String(email).trim();
+  Logger.log("📌 Extracted Email: " + emailAddress);
+
+  if (emailAddress && emailAddress.includes("@") && emailAddress.includes(".")) {
+    MailApp.sendEmail({
+      to: emailAddress,
+      subject: "Your Hire Purchase Agreement Submission",
+      body: "Dear " + fullName + ",\n\nThank you for your submission. Please find attached your Hire Purchase Agreement.\n\nBest Regards,\nCHANTEQ LIMITED",
+      attachments: [pdfDoc]
+    });
+  } else {
+    Logger.log("⚠️ Error: Invalid or missing email for " + fullName);
+  }
+
+  var marketingEmail = "chanteqlimited@gmail.com";
+  MailApp.sendEmail({
+    to: marketingEmail,
+    subject: "New Hire Purchase Agreement Submission",
+    body: "A new client has submitted a Hire Purchase Agreement.\n\nClient Name: " + fullName + "\nEmail: " + emailAddress + "\nPhone: " + phone + "\n\nAttached is the agreement.",
+    attachments: [pdfDoc]
+  });
+
+  var lastColumn = sheet.getLastColumn();
+  sheet.getRange(lastRow, lastColumn).setValue("Agreement Generated");
+}
