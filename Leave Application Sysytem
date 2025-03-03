@@ -1,0 +1,28 @@
+function sendLeaveNotification() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Leave Requests"); // Change if your sheet name is different
+  var lastRow = sheet.getLastRow();
+  
+  for (var i = 2; i <= lastRow; i++) {
+    var email = sheet.getRange(i, 2).getValue(); // Email Address (Column B)
+    var name = sheet.getRange(i, 3).getValue(); // Employee Name (Column C)
+    var totalLeaveDays = sheet.getRange(i, 7).getValue(); // Total Leave Days (Column G)
+    var remainingLeaveDays = sheet.getRange(i, 8).getValue(); // Remaining Leave Days (Column H)
+
+    // Avoid sending multiple emails for the same request
+    var statusCell = sheet.getRange(i, 9); // Column I for tracking sent status
+    if (statusCell.getValue() === "Sent") continue;
+
+    var subject = "Leave Request Processed";
+    var body = "Hello " + name + ",\n\n" +
+      "Your leave request has been processed.\n\n" +
+      "Total Leave Days: " + totalLeaveDays + "\n" +
+      "Remaining Leave Days: " + remainingLeaveDays + "\n\n" +
+      "Regards,\nHR Team";
+
+    // Send the email
+    MailApp.sendEmail(email, subject, body);
+
+    // Mark email as sent
+    statusCell.setValue("Sent");
+  }
+}
